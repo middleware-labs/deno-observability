@@ -7,7 +7,7 @@ import { DenoKvInstrumentation } from "./deno-kv.ts";
 
 export function getDenoAutoInstrumentations() {
   const instrs: InstrumentationBase[] = [
-    new FetchInstrumentation(),
+    new FetchInstrumentation({ignoreUrls:[/middleware.io/i]}),
   ];
 
   // Rough check to exclude Deno Deploy, which doesn't have subprocesses etc.
