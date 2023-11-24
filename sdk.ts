@@ -93,7 +93,7 @@ export class DenoTelemetrySdk {
       sampler: props?.sampler,
     });
     this.tracer.register({
-      contextManager: new DenoAsyncHooksContextManager().enable(),
+    //  contextManager: new DenoAsyncHooksContextManager().enable(),
       propagator: props?.propagator,
     });
 
