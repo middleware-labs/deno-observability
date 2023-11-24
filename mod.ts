@@ -17,3 +17,7 @@ export {
 export {
   DenoTelemetrySdk,
 } from "./sdk.ts";
+
+export {
+  track,info,debug,error,warn,
+} from "./track.ts";
