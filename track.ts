@@ -23,6 +23,7 @@ export function track(config: Config) {
     resourceAttrs: {
       'service.name':configDefault.serviceName,
       'mw.account_key':configDefault.accessToken,
+      'mw_serverless':1,
     },
     otlpEndpointBase:configDefault.target,
     instrumentations: [
