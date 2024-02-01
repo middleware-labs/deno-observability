@@ -9,7 +9,7 @@ import {
   type TextMapGetter,
 } from "../opentelemetry/api.js";
 
-export function httpTracer(inner: Deno.ServeHandler): Deno.ServeHandler {
+export function httpTracer(inner: Handler): Handler {
 
   // https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/http.md
   const tracer = trace.getTracer('http');
@@ -19,7 +19,7 @@ export function httpTracer(inner: Deno.ServeHandler): Deno.ServeHandler {
   const durationMetric = myMeter.createHistogram('http.server.duration', {valueType: ValueType.DOUBLE});
   const inflightMetric = myMeter.createUpDownCounter('http.server.active_requests', {valueType: ValueType.INT});
 
-  return (req: Request, connInfo: Deno.ServeHandlerInfo) => {
+  return async (req: Request, connInfo: ConnInfo) => {
     const d0 = performance.now();
     const url = new URL(req.url);
 
@@ -45,19 +45,20 @@ export function httpTracer(inner: Deno.ServeHandler): Deno.ServeHandler {
     }, ctx, async (serverSpan) => {
       try {
 
-        if (connInfo.remoteAddr.transport == 'tcp') {
+        if (connInfo.localAddr.transport == 'tcp' && connInfo.remoteAddr.transport == 'tcp') {
           serverSpan.setAttributes({
             [SemanticAttributes.NET_TRANSPORT]: NetTransportValues.IP_TCP,
+            [SemanticAttributes.NET_HOST_IP]: connInfo.localAddr.hostname,
+            [SemanticAttributes.NET_HOST_PORT]: connInfo.localAddr.port,
             [SemanticAttributes.NET_PEER_IP]: connInfo.remoteAddr.hostname,
             [SemanticAttributes.NET_PEER_PORT]: connInfo.remoteAddr.port,
             ['net.sock.family']: connInfo.remoteAddr.hostname.includes(':') ? 'inet6' : 'inet',
           })
-        // Unix sockets are currently behind --unstable so we can't just ref Deno.ServeUnixHandler today
-        // } else if (connInfo.localAddr.transport == 'unix' || connInfo.localAddr.transport == 'unixpacket') {
-        //   serverSpan.setAttributes({
-        //     [SemanticAttributes.NET_TRANSPORT]: NetTransportValues.UNIX,
-        //     ['net.sock.family']: 'unix',
-        //   })
+        } else if (connInfo.localAddr.transport == 'unix' || connInfo.localAddr.transport == 'unixpacket') {
+          serverSpan.setAttributes({
+            [SemanticAttributes.NET_TRANSPORT]: NetTransportValues.UNIX,
+            ['net.sock.family']: 'unix',
+          })
         }
 
         // The actual call to user code
@@ -69,13 +70,6 @@ export function httpTracer(inner: Deno.ServeHandler): Deno.ServeHandler {
           serverSpan.setAttribute('http.status_text', resp.statusText);
         }
 
-        // Don't snoop the response body if it's not present, including for websockets
-        if (resp.body == null) {
-          inflightMetric.add(-1, reqMetricAttrs);
-          serverSpan.end();
-          return resp;
-        }
-
         const respSnoop = snoopStream(resp.body);
         respSnoop.finalSize.then(size => {
           serverSpan.setAttribute(SemanticAttributes.HTTP_RESPONSE_CONTENT_LENGTH_UNCOMPRESSED, size);
@@ -84,7 +78,7 @@ export function httpTracer(inner: Deno.ServeHandler): Deno.ServeHandler {
           serverSpan.end();
         });
 
-        return new Response(respSnoop.newBody, resp);
+        return new Response(respSnoop.newBody, resp)
 
       } catch (err) {
         serverSpan.recordException(err);
@@ -102,6 +96,17 @@ const HeadersGetter: TextMapGetter<Headers> = {
   get(h,k) { return h.get(k) ?? undefined; },
   keys(h) { return Array.from(h.keys()); },
 };
+
+// Copies of /std/http/server.ts
+interface ConnInfo {
+  readonly localAddr: Deno.Addr;
+  readonly remoteAddr: Deno.Addr;
+}
+type Handler = (
+  request: Request,
+  connInfo: ConnInfo,
+) => Response | Promise<Response>;
+
 
 function snoopStream(stream: ReadableStream<Uint8Array>|null) {
   if (stream) {
