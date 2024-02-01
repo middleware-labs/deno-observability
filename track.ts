@@ -14,10 +14,9 @@ const configDefault: Config = {
   accessToken: '',
 };
 
-export function track(config: Config) {
+export function track(config: Config): DenoTelemetrySdk  {
   Object.keys(configDefault).forEach((key) => {
-    // @ts-ignore
-    configDefault[key] = config[key] ?? configDefault[key];
+    configDefault[key] = config[key] ?? configDefault[key] as string;
   });
   return new DenoTelemetrySdk({
     resourceAttrs: {
