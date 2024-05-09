@@ -45,7 +45,7 @@ export function httpTracer(inner: Handler): Handler {
     }, ctx, async (serverSpan) => {
       try {
 
-        if (connInfo.localAddr.transport == 'tcp' && connInfo.remoteAddr.transport == 'tcp') {
+        if (connInfo?.localAddr?.transport == 'tcp' && connInfo?.remoteAddr?.transport == 'tcp') {
           serverSpan.setAttributes({
             [SemanticAttributes.NET_TRANSPORT]: NetTransportValues.IP_TCP,
             [SemanticAttributes.NET_HOST_IP]: connInfo.localAddr.hostname,
@@ -54,7 +54,7 @@ export function httpTracer(inner: Handler): Handler {
             [SemanticAttributes.NET_PEER_PORT]: connInfo.remoteAddr.port,
             ['net.sock.family']: connInfo.remoteAddr.hostname.includes(':') ? 'inet6' : 'inet',
           })
-        } else if (connInfo.localAddr.transport == 'unix' || connInfo.localAddr.transport == 'unixpacket') {
+        } else if (connInfo?.localAddr?.transport == 'unix' || connInfo?.localAddr?.transport == 'unixpacket') {
           serverSpan.setAttributes({
             [SemanticAttributes.NET_TRANSPORT]: NetTransportValues.UNIX,
             ['net.sock.family']: 'unix',
